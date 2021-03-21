@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html class="no-js" lang="">
+  <head>
+    <meta charset="utf-8" />
+    <title></title>
+    <meta name="description" content="" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <meta property="og:title" content="" />
+    <meta property="og:type" content="" />
+    <meta property="og:url" content="" />
+    <meta property="og:image" content="" />
+  </head>
+
+  <body>
+    <h2 class="team"></h2>
+    <div class="your-turn"></div>
+    <div class="tabu"></div>
+    <div class="timer">
+
+    </div>
+    <div class="buttons">
+      <button class="skip">skip</div>
+    </div>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/jquery/dist/jquery.js"></script>
+    <script>
+      const socket = io.connect('http://192.168.0.107:4200');
+      socket.on('connect', function (data) {
+        socket.emit('join', socket.id);
+      });
+      socket.on('tabu', function (data) {
+        $('.tabu').html(data ? data : '');
+      });
+      socket.on('team-assignment', function (assignment) {
+        $('.team').html('You are in team: '+ assignment);
+      });
+
+      let count;
+      let interval;
+      socket.on('your-turn', function (countdown) {
+        $('.skip').show();
+        $('.your-turn').text('It is your turn');
+        count = countdown;
+        clearInterval(interval) 
+        interval = setInterval(() => {
+            if(count <= 0) clearInterval(interval) 
+            $('.timer').html(count--);
+        }, 1000)
+      });
+      socket.on('not-your-turn', function (color) {
+          $('.skip').hide();
+        $('.your-turn').text('It is ' + color + ' turn');
+        $('.timer').html('');
+        clearInterval(interval) 
+      });
+      $('.skip').click(event => {
+        socket.emit('skip', socket.id);
+      })
+    </script>
+  </body>
+</html>
