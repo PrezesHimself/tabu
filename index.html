@@ -11,17 +11,77 @@
     <meta property="og:url" content="" />
     <meta property="og:image" content="" />
   </head>
-
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.4.1/semantic.min.css"
+    integrity="sha512-8bHTC73gkZ7rZ7vpqUQThUDhqcNFyYi2xgDgPDHc+GXVGHXq+xPjynxIopALmOPqzo9JZj0k6OqqewdGO3EsrQ=="
+    crossorigin="anonymous"
+  />
+  <style>
+    body {
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .splash,
+    .game {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: white;
+      display: flex;
+      flex-direction: column;
+      padding: 20px;
+    }
+    .splash > .card,
+    .game > .card {
+      width: 100vw;
+      height: 100vh;
+    }
+  </style>
   <body>
-    <h2 class="team"></h2>
-    <div class="your-turn"></div>
-    <div class="tabu"></div>
-    <div class="timer">
+    <div class="splash">
+      <div class="ui card">
+        <div class="content">
+          <h2 class="team"></h2>
+        </div>
+        <div class="content">
+          <h4 class="readiness"></h4>
+        </div>
+        <div class="extra content">
+          <div class="ui large transparent left icon input">
+            <button class="ui button ready">ready</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="game">
+      <div class="ui card">
+        <div class="content">
+          <h2 class="team"></h2>
 
+          <div class="your-turn"></div>
+          <div class="score"></div>
+          <div class="timer"></div>
+        </div>
+        <div class="content">
+          <div class="tabu"></div>
+        </div>
+        <div class="extra content">
+          <div class="ui large transparent left icon input">
+            <div class="buttons">
+              <button class="ui button skip">skip</button>
+              <button class="ui button ok">ok</button>
+              <button class="ui button wrong">wrong</button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
-    <div class="buttons">
-      <button class="skip">skip</div>
-    </div>
+
     <script src="/socket.io/socket.io.js"></script>
     <script src="/jquery/dist/jquery.js"></script>
     <script>
@@ -29,34 +89,59 @@
       socket.on('connect', function (data) {
         socket.emit('join', socket.id);
       });
+      socket.on('readiness', function (data) {
+        $('.readiness').html(data ? data + ' ready' : '');
+      });
       socket.on('tabu', function (data) {
         $('.tabu').html(data ? data : '');
       });
       socket.on('team-assignment', function (assignment) {
-        $('.team').html('You are in team: '+ assignment);
+        $('.team').html('You are in team: ' + assignment);
       });
 
       let count;
       let interval;
+
+      socket.on('score', function (score) {
+        $('.score').text(`blue ${score.blue} : ${score.red} red`);
+      });
+      socket.on('game-state', function (gameIsOn) {
+        console.log(gameIsOn);
+        gameIsOn ? $('.splash').hide() : $('.splash').show();
+        gameIsOn ? $('.game').show() : $('.game').hide();
+      });
       socket.on('your-turn', function (countdown) {
         $('.skip').show();
+        $('.ok').show();
+        $('.wrong').hide();
         $('.your-turn').text('It is your turn');
         count = countdown;
-        clearInterval(interval) 
+        clearInterval(interval);
         interval = setInterval(() => {
-            if(count <= 0) clearInterval(interval) 
-            $('.timer').html(count--);
-        }, 1000)
+          if (count <= 0) clearInterval(interval);
+          $('.timer').html(count--);
+        }, 1000);
       });
       socket.on('not-your-turn', function (color) {
-          $('.skip').hide();
+        $('.skip').hide();
+        $('.ok').hide();
+        $('.wrong').show();
         $('.your-turn').text('It is ' + color + ' turn');
         $('.timer').html('');
-        clearInterval(interval) 
+        clearInterval(interval);
       });
-      $('.skip').click(event => {
+      $('.skip').click((event) => {
         socket.emit('skip', socket.id);
-      })
+      });
+      $('.ready').click((event) => {
+        socket.emit('ready', socket.id);
+      });
+      $('.ok').click((event) => {
+        socket.emit('ok', socket.id);
+      });
+      $('.wrong').click((event) => {
+        socket.emit('wrong', socket.id);
+      });
     </script>
   </body>
 </html>
