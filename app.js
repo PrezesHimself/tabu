@@ -4,7 +4,11 @@ const app = express();
 const http = require('http');
 const fetch = require('node-fetch');
 const server = http.createServer(app);
-const io = require('socket.io')(server);
+const io = require('socket.io')(server, {
+  cors: {
+    origin: '*',
+  },
+});
 
 app.use(express.static(__dirname + '/node_modules'));
 app.get('/', function (req, res, next) {
