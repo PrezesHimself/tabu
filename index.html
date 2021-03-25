@@ -86,50 +86,65 @@
     <script src="/jquery/dist/jquery.js"></script>
     <script>
       const socket = io.connect('http://192.168.0.107:4200');
+      let count;
+      let interval;
       socket.on('connect', function (data) {
         socket.emit('join', socket.id);
       });
-      socket.on('readiness', function (data) {
-        $('.readiness').html(data ? data + ' ready' : '');
-      });
-      socket.on('tabu', function (data) {
-        $('.tabu').html(data ? data : '');
-      });
-      socket.on('team-assignment', function (assignment) {
-        $('.team').html('You are in team: ' + assignment);
+      socket.on('gameState', function (data) {
+        const {
+          gameIsOn,
+          readiness,
+          tabu,
+          score,
+          yourTeam,
+          yourTurn,
+          teamsTurn,
+          roundLength,
+        } = data;
+        $('.team').html('You are in team: ' + yourTeam);
+        console.log('its on?', data);
+        if (!gameIsOn) {
+          $('.splash').show();
+          $('.game').hide();
+          $('.readiness').html(readiness ? readiness + ' ready' : '');
+          $('.timer').html('');
+        } else {
+          console.log('its on');
+          $('.splash').hide();
+          $('.game').show();
+          $('.tabu').html(tabu ? tabu : '');
+          $('.score').text(`blue ${score.blue} : ${score.red} red`);
+
+          $('.your-turn').text(
+            yourTurn ? 'It is your turn' : 'not your turn mate'
+          );
+          if (yourTurn) {
+            $('.skip').show();
+            $('.ok').show();
+            count = roundLength;
+            if (!interval) {
+              interval = setInterval(() => {
+                if (count <= 0) clearInterval(interval);
+                console.log(count);
+                $('.timer').html(count--);
+              }, 1000);
+            }
+          } else {
+            $('.timer').html('');
+            clearInterval(interval);
+            $('.skip').hide();
+            $('.ok').hide();
+          }
+
+          if (teamsTurn === yourTeam) {
+            $('.wrong').hide();
+          } else {
+            $('.wrong').show();
+          }
+        }
       });
 
-      let count;
-      let interval;
-
-      socket.on('score', function (score) {
-        $('.score').text(`blue ${score.blue} : ${score.red} red`);
-      });
-      socket.on('game-state', function (gameIsOn) {
-        console.log(gameIsOn);
-        gameIsOn ? $('.splash').hide() : $('.splash').show();
-        gameIsOn ? $('.game').show() : $('.game').hide();
-      });
-      socket.on('your-turn', function (countdown) {
-        $('.skip').show();
-        $('.ok').show();
-        $('.wrong').hide();
-        $('.your-turn').text('It is your turn');
-        count = countdown;
-        clearInterval(interval);
-        interval = setInterval(() => {
-          if (count <= 0) clearInterval(interval);
-          $('.timer').html(count--);
-        }, 1000);
-      });
-      socket.on('not-your-turn', function (color) {
-        $('.skip').hide();
-        $('.ok').hide();
-        $('.wrong').show();
-        $('.your-turn').text('It is ' + color + ' turn');
-        $('.timer').html('');
-        clearInterval(interval);
-      });
       $('.skip').click((event) => {
         socket.emit('skip', socket.id);
       });

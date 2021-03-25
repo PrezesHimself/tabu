@@ -35,50 +35,6 @@ const removeUser = (socketId) =>
 const getTeam = (color) => users.filter((user) => user.team === color);
 const getUser = (socketId) => users.find((user) => user.id === socketId);
 
-const emitTabu = (io) => {
-  users.forEach((user) => {
-    io.to(user.id).emit(
-      'tabu',
-      user.team !== game.turn || users[game.currentUser].id === user.id
-        ? game.tabu
-        : null
-    );
-  });
-};
-
-const emitScore = (io) => {
-  users.forEach((user) => {
-    io.to(user.id).emit('score', game.score);
-  });
-};
-
-const emitGame = (io) => {
-  users.forEach((user) => {
-    io.to(user.id).emit('game-state', game.gameInOn);
-  });
-};
-
-const emitReadiness = (io) => {
-  users.forEach((user) => {
-    user;
-    io.to(user.id).emit(
-      'readiness',
-      users.filter((user) => user.ready).length + '/' + users.length
-    );
-  });
-};
-
-const whoseTurn = (io) => {
-  users.forEach((user) => {
-    io.to(user.id).emit(
-      users[game.currentUser].id === user.id ? 'your-turn' : 'not-your-turn',
-      users[game.currentUser].id === user.id
-        ? game.roundLength
-        : users[game.currentUser].team
-    );
-  });
-};
-
 io.on('connection', function (socket) {
   console.log('a user connected: ' + socket.id);
   socket.on('disconnect', function () {
@@ -89,31 +45,25 @@ io.on('connection', function (socket) {
     addUser(socket);
     socket.ready = false;
     io.to(socket.id).emit('team-assignment', socket.team);
-    emitReadiness(io);
-    emitGame(io);
+    game.emitState();
   });
   socket.on('skip', async function () {
     await game.nextTabu();
-    emitTabu(io);
   });
   socket.on('ready', async function () {
     socket.ready = true;
     if (users.every((user) => user.ready)) {
       game.start();
     }
-    emitReadiness(io);
+    game.emitState();
   });
   socket.on('ok', async function (socketId) {
     game.updateScore(getUser(socketId).team, 1);
     await game.nextTabu();
-    emitTabu(io);
-    emitScore(io);
   });
   socket.on('wrong', async function (socketId) {
     game.updateScore(getUser(socketId).team === 'red' ? 'blue' : 'red', -1);
     await game.nextTabu();
-    emitTabu(io);
-    emitScore(io);
   });
 });
 
@@ -131,7 +81,6 @@ class Game {
 
   constructor(roundLength, teams, io) {
     this.gameInOn = false;
-    emitGame(io);
     this.nextTabu().then((res) => {
       this.roundLength = roundLength;
       teams.forEach((team) => (this.score[team] = 0));
@@ -142,35 +91,68 @@ class Game {
     await game.nextTabu();
     this.currentUser = ++this.currentUser % users.length;
     this.turn = users[game.currentUser].team;
-    emitTabu(this.io);
-    whoseTurn(this.io);
+    this.emitState();
   }
 
   updateScore(team, points) {
     this.score[team] = this.score[team] + points;
+    this.emitState();
+  }
+
+  getCurrentUser() {
+    return this.currentUser > -1 && users && users.length
+      ? users[this.currentUser]
+      : null;
+  }
+
+  getCurrentUserId() {
+    return this.getCurrentUser() ? this.getCurrentUser().id : -1;
+  }
+
+  getCurrentTeamTurn() {
+    return this.getCurrentUser() ? this.getCurrentUser().team : null;
+  }
+
+  getCurrentTurn() {
+    return this.getCurrentUser() ? this.getCurrentUser().team : null;
+  }
+
+  emitState() {
+    users.forEach((user) => {
+      io.to(user.id).emit('gameState', {
+        score: this.score,
+        currentUser: this.currentUser,
+        gameIsOn: this.gameInOn,
+        yourTurn: this.getCurrentUserId() === user.id,
+        yourTeam: user.team,
+        roundLength: this.roundLength,
+        teamsTurn: this.getCurrentTeamTurn(),
+        readiness:
+          users.filter((user) => user.ready).length + '/' + users.length,
+        tabu:
+          user.team !== this.turn || users[this.currentUser].id === user.id
+            ? this.tabu
+            : null,
+      });
+    });
   }
 
   start() {
     this.gameInOn = true;
-    console.log('game start');
     this.nextUser();
-    emitGame(io);
     this.timer = setInterval(() => {
       this.nextUser();
-      emitTabu(this.io);
-      whoseTurn(this.io);
-      emitScore(this.io);
     }, 1000 * this.roundLength);
   }
 
   stop() {
     clearInterval(this.timer);
     this.gameInOn = false;
-    emitGame(io);
   }
 
   async nextTabu() {
     this.tabu = await this.getTabu();
+    this.emitState();
     return this.tabu;
   }
 
@@ -183,6 +165,6 @@ class Game {
   }
 }
 
-const game = new Game(120, ['blue', 'red'], io);
+const game = new Game(20, ['blue', 'red'], io);
 
 server.listen(4200);
